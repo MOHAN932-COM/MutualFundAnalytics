@@ -1,0 +1,42 @@
+DATA QUALITY SUMMARY
+
+Dataset 1 - fund_master
+✔ No missing values
+✔ No duplicate rows
+
+Dataset 2 - nav_history
+✔ No missing values
+✔ No duplicate rows
+
+Dataset 3 - aum_by_fund_house
+✔ No missing values
+✔ No duplicate rows
+
+Dataset 4 - monthly_sip_inflows
+✔ Duplicate rows: 0
+⚠ Missing values:
+   yoy_growth_pct = 12
+
+Dataset 5 - category_inflows
+✔ No missing values
+✔ No duplicate rows
+
+Dataset 6 - industry_folio_count
+✔ No missing values
+✔ No duplicate rows
+
+Dataset 7 - scheme_performance
+✔ No missing values
+✔ No duplicate rows
+
+Dataset 8 - investor_transactions
+✔ No missing values
+✔ No duplicate rows
+
+Dataset 9 - portfolio_holdings
+✔ No missing values
+✔ No duplicate rows
+
+Dataset 10 - benchmark_indices
+✔ No missing values
+✔ No duplicate rows
