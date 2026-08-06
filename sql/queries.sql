@@ -53,3 +53,110 @@ SELECT benchmark_name,
 AVG(close_value) AS average_close
 FROM benchmark_indices
 GROUP BY benchmark_name;
+
+SELECT * FROM aum_by_fund_house;
+
+SELECT fund_house, aum_crore
+FROM aum_by_fund_house
+WHERE fund_house = 'SBI Mutual Fund';
+
+SELECT fund_house, aum_crore
+FROM aum_by_fund_house
+WHERE aum_crore > 500000;
+
+SELECT fund_house, aum_crore
+FROM aum_by_fund_house
+ORDER BY aum_crore DESC;
+
+SELECT fund_house, aum_crore
+FROM aum_by_fund_house
+ORDER BY aum_crore ASC;
+
+SELECT COUNT(*) AS total_records
+FROM aum_by_fund_house;
+
+SELECT SUM(aum_crore) AS total_aum
+FROM aum_by_fund_house;
+
+SELECT AVG(aum_crore) AS average_aum
+FROM aum_by_fund_house;
+
+SELECT MAX(aum_crore) AS highest_aum
+FROM aum_by_fund_house;
+
+SELECT MIN(aum_crore) AS lowest_aum
+FROM aum_by_fund_house;
+
+SELECT fund_house,
+       SUM(aum_crore) AS total_aum
+FROM aum_by_fund_house
+GROUP BY fund_house;
+
+SELECT fund_house,
+       SUM(aum_crore) AS total_aum
+FROM aum_by_fund_house
+GROUP BY fund_house
+ORDER BY total_aum DESC;
+
+SELECT fund_house,
+       SUM(aum_crore) AS total_aum
+FROM aum_by_fund_house
+GROUP BY fund_house
+HAVING total_aum > 3000000;
+
+SELECT fund_house,
+       SUM(aum_crore) AS total_aum
+FROM aum_by_fund_house
+GROUP BY fund_house
+ORDER BY total_aum DESC
+LIMIT 5;
+
+SELECT
+    fund_house,
+    aum_crore,
+    RANK() OVER (ORDER BY aum_crore DESC) AS ranking
+FROM aum_by_fund_house;
+
+-- 11. Fund Houses with Total AUM greater than 30 lakh crore
+SELECT fund_house,
+       SUM(aum_crore) AS total_aum
+FROM aum_by_fund_house
+GROUP BY fund_house
+HAVING total_aum > 3000000;
+
+-- 12. Fund Name with Latest NAV
+SELECT
+    f.amfi_code,
+    f.scheme_name,
+    n.nav
+FROM fund_master f
+JOIN nav_history n
+ON f.amfi_code = n.amfi_code
+LIMIT 10;
+
+-- 13. Fund House and Scheme Names
+SELECT
+    f.fund_house,
+    f.scheme_name,
+    a.aum_crore
+FROM fund_master f
+JOIN aum_by_fund_house a
+ON f.fund_house = a.fund_house
+LIMIT 10;
+
+-- 14. Funds with Expense Ratio Above Average
+SELECT
+    scheme_name,
+    expense_ratio_pct
+FROM fund_master
+WHERE expense_ratio_pct >
+(
+    SELECT AVG(expense_ratio_pct)
+    FROM fund_master
+);
+-- 15. Rank Fund Houses by AUM
+SELECT
+    fund_house,
+    aum_crore,
+    RANK() OVER (ORDER BY aum_crore DESC) AS fund_rank
+FROM aum_by_fund_house;
