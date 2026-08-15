@@ -1,0 +1,5 @@
+investor_profile,recommended_risk_level,category,avg_return_3yr,avg_volatility,balanced_score
+Conservative,Low Risk,Liquid,6.333333333333333,0.5,56.72228711958192
+Moderate,Moderate Risk,Value,14.76,15.0,56.83615124500461
+Aggressive,High Risk,Flexi Cap,15.495000000000001,16.0,57.269658776513985
+Very Aggressive,Very High Risk,Small Cap,21.686666666666667,25.0,60.0
