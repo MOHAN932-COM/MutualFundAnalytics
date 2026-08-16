@@ -1,141 +1,269 @@
+from pathlib import Path
 import pandas as pd
-import os
 
-# ===============================
-# Paths
-# ===============================
-raw_path = "data/raw"
-processed_path = "data/processed"
 
-os.makedirs(processed_path, exist_ok=True)
+# ============================================================
+# PROJECT PATHS
+# ============================================================
 
-# ===============================
-# Read CSV Files
-# ===============================
-fund_master = pd.read_csv(f"{raw_path}/01_fund_master.csv")
-nav_history = pd.read_csv(f"{raw_path}/02_nav_history.csv")
-aum = pd.read_csv(f"{raw_path}/03_aum_by_fund_house.csv")
-sip = pd.read_csv(f"{raw_path}/04_monthly_sip_inflows.csv")
-category = pd.read_csv(f"{raw_path}/05_category_inflows.csv")
-folio = pd.read_csv(f"{raw_path}/06_industry_folio_count.csv")
-performance = pd.read_csv(f"{raw_path}/07_scheme_performance.csv")
-transactions = pd.read_csv(f"{raw_path}/08_investor_transactions.csv")
-portfolio = pd.read_csv(f"{raw_path}/09_portfolio_holdings.csv")
-benchmark = pd.read_csv(f"{raw_path}/10_benchmark_indices.csv")
+PROJECT_DIR = Path(__file__).resolve().parent
 
-# =====================================================
+RAW_DIR = PROJECT_DIR / "data" / "raw"
+PROCESSED_DIR = PROJECT_DIR / "data" / "processed"
+
+PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+
+
+# ============================================================
+# HELPER FUNCTION
+# ============================================================
+
+def read_csv(filename):
+    """Read a CSV file from the raw data directory."""
+    file_path = RAW_DIR / filename
+
+    if not file_path.exists():
+        raise FileNotFoundError(
+            f"Raw data file not found: {file_path}"
+        )
+
+    return pd.read_csv(file_path)
+
+
+# ============================================================
+# READ RAW CSV FILES
+# ============================================================
+
+print("=" * 60)
+print("READING RAW DATA")
+print("=" * 60)
+
+fund_master = read_csv("01_fund_master.csv")
+nav_history = read_csv("02_nav_history.csv")
+aum = read_csv("03_aum_by_fund_house.csv")
+sip = read_csv("04_monthly_sip_inflows.csv")
+category = read_csv("05_category_inflows.csv")
+folio = read_csv("06_industry_folio_count.csv")
+performance = read_csv("07_scheme_performance.csv")
+transactions = read_csv("08_investor_transactions.csv")
+portfolio = read_csv("09_portfolio_holdings.csv")
+benchmark = read_csv("10_benchmark_indices.csv")
+
+
+# ============================================================
 # 01 FUND MASTER
-# =====================================================
+# ============================================================
 
-fund_master.drop_duplicates(inplace=True)
+fund_master = fund_master.drop_duplicates()
 
-fund_master["launch_date"] = pd.to_datetime(fund_master["launch_date"])
+fund_master["launch_date"] = pd.to_datetime(
+    fund_master["launch_date"],
+    errors="coerce"
+)
 
 fund_master.to_csv(
-    f"{processed_path}/01_fund_master.csv",
+    PROCESSED_DIR / "01_fund_master.csv",
     index=False
 )
 
-print("01_fund_master cleaned")
+print("✓ 01_fund_master cleaned")
 
-# =====================================================
+
+# ============================================================
 # 02 NAV HISTORY
-# =====================================================
+# ============================================================
 
-nav_history.drop_duplicates(inplace=True)
-
-nav_history["date"] = pd.to_datetime(nav_history["date"])
-
-nav_history.sort_values(
-    ["amfi_code", "date"],
-    inplace=True
+nav_history = nav_history.drop_duplicates(
+    subset=["amfi_code", "date"]
 )
 
-nav_history["nav"] = (
-    nav_history.groupby("amfi_code")["nav"]
-    .ffill()
+nav_history["date"] = pd.to_datetime(
+    nav_history["date"],
+    errors="coerce"
 )
 
-nav_history = nav_history[nav_history["nav"] > 0]
+nav_history["nav"] = pd.to_numeric(
+    nav_history["nav"],
+    errors="coerce"
+)
+
+nav_history = nav_history.dropna(
+    subset=["amfi_code", "date"]
+)
+
+nav_history = nav_history.sort_values(
+    ["amfi_code", "date"]
+)
+
+
+# Create a complete daily date range for every fund
+# and forward-fill NAV for weekends and holidays.
+
+completed_groups = []
+
+for amfi_code, group in nav_history.groupby("amfi_code"):
+
+    group = group.sort_values("date").copy()
+
+    start_date = group["date"].min()
+    end_date = group["date"].max()
+
+    full_dates = pd.date_range(
+        start=start_date,
+        end=end_date,
+        freq="D"
+    )
+
+    group = (
+        group
+        .set_index("date")
+        .reindex(full_dates)
+    )
+
+    group.index.name = "date"
+
+    # Restore AMFI code after reindexing
+    group["amfi_code"] = amfi_code
+
+    # Forward-fill NAV across weekends and holidays
+    group["nav"] = group["nav"].ffill()
+
+    completed_groups.append(
+        group.reset_index()
+    )
+
+
+nav_history = pd.concat(
+    completed_groups,
+    ignore_index=True
+)
+
+nav_history = nav_history[
+    nav_history["nav"] > 0
+]
+
+nav_history = nav_history.sort_values(
+    ["amfi_code", "date"]
+)
 
 nav_history.to_csv(
-    f"{processed_path}/02_nav_history.csv",
+    PROCESSED_DIR / "02_nav_history.csv",
     index=False
 )
 
-print("02_nav_history cleaned")
+print("✓ 02_nav_history cleaned")
 
-# =====================================================
+print(
+    f"  NAV rows after complete date handling: "
+    f"{len(nav_history):,}"
+)
+
+# ============================================================
 # 03 AUM BY FUND HOUSE
-# =====================================================
+# ============================================================
 
-aum.drop_duplicates(inplace=True)
+aum = aum.drop_duplicates()
 
-aum["date"] = pd.to_datetime(aum["date"])
+aum["date"] = pd.to_datetime(
+    aum["date"],
+    errors="coerce"
+)
 
-aum = aum[aum["aum_crore"] > 0]
+aum["aum_crore"] = pd.to_numeric(
+    aum["aum_crore"],
+    errors="coerce"
+)
+
+aum = aum[
+    aum["aum_crore"] > 0
+]
 
 aum.to_csv(
-    f"{processed_path}/03_aum_by_fund_house.csv",
+    PROCESSED_DIR / "03_aum_by_fund_house.csv",
     index=False
 )
 
-print("03_aum_by_fund_house cleaned")
+print("✓ 03_aum_by_fund_house cleaned")
 
-# =====================================================
+
+# ============================================================
 # 04 MONTHLY SIP INFLOWS
-# =====================================================
+# ============================================================
 
-sip.drop_duplicates(inplace=True)
+sip = sip.drop_duplicates()
 
-sip["month"] = pd.to_datetime(sip["month"])
+sip["month"] = pd.to_datetime(
+    sip["month"],
+    errors="coerce"
+)
 
-sip["yoy_growth_pct"] = sip["yoy_growth_pct"].fillna(0)
+sip["yoy_growth_pct"] = pd.to_numeric(
+    sip["yoy_growth_pct"],
+    errors="coerce"
+).fillna(0)
 
 sip.to_csv(
-    f"{processed_path}/04_monthly_sip_inflows.csv",
+    PROCESSED_DIR / "04_monthly_sip_inflows.csv",
     index=False
 )
 
-print("04_monthly_sip_inflows cleaned")
+print("✓ 04_monthly_sip_inflows cleaned")
 
-# =====================================================
+
+# ============================================================
 # 05 CATEGORY INFLOWS
-# =====================================================
+# ============================================================
 
-category.drop_duplicates(inplace=True)
+category = category.drop_duplicates()
 
-category["month"] = pd.to_datetime(category["month"])
+category["month"] = pd.to_datetime(
+    category["month"],
+    errors="coerce"
+)
 
-category["category"] = category["category"].str.strip()
+category["category"] = (
+    category["category"]
+    .astype(str)
+    .str.strip()
+)
 
 category.to_csv(
-    f"{processed_path}/05_category_inflows.csv",
+    PROCESSED_DIR / "05_category_inflows.csv",
     index=False
 )
 
-print("05_category_inflows cleaned")
+print("✓ 05_category_inflows cleaned")
 
-# =====================================================
+
+# ============================================================
 # 06 INDUSTRY FOLIO COUNT
-# =====================================================
+# ============================================================
 
-folio.drop_duplicates(inplace=True)
+folio = folio.drop_duplicates()
 
-folio["month"] = pd.to_datetime(folio["month"])
+folio["month"] = pd.to_datetime(
+    folio["month"],
+    errors="coerce"
+)
 
 folio.to_csv(
-    f"{processed_path}/06_industry_folio_count.csv",
+    PROCESSED_DIR / "06_industry_folio_count.csv",
     index=False
 )
 
-print("06_industry_folio_count cleaned")
+print("✓ 06_industry_folio_count cleaned")
 
-# =====================================================
+
+# ============================================================
 # 07 SCHEME PERFORMANCE
-# =====================================================
+# ============================================================
 
-performance.drop_duplicates(inplace=True)
+performance = performance.drop_duplicates()
+
+performance["expense_ratio_pct"] = pd.to_numeric(
+    performance["expense_ratio_pct"],
+    errors="coerce"
+)
 
 performance = performance[
     (performance["expense_ratio_pct"] >= 0)
@@ -144,32 +272,41 @@ performance = performance[
 ]
 
 performance.to_csv(
-    f"{processed_path}/07_scheme_performance.csv",
+    PROCESSED_DIR / "07_scheme_performance.csv",
     index=False
 )
 
-print("07_scheme_performance cleaned")
+print("✓ 07_scheme_performance cleaned")
 
-# =====================================================
+
+# ============================================================
 # 08 INVESTOR TRANSACTIONS
-# =====================================================
+# ============================================================
 
-transactions.drop_duplicates(inplace=True)
+transactions = transactions.drop_duplicates()
 
 transactions["transaction_date"] = pd.to_datetime(
-    transactions["transaction_date"]
+    transactions["transaction_date"],
+    errors="coerce"
 )
 
 transactions["transaction_type"] = (
     transactions["transaction_type"]
+    .astype(str)
     .str.upper()
     .str.strip()
 )
 
 transactions["kyc_status"] = (
     transactions["kyc_status"]
+    .astype(str)
     .str.upper()
     .str.strip()
+)
+
+transactions["amount_inr"] = pd.to_numeric(
+    transactions["amount_inr"],
+    errors="coerce"
 )
 
 transactions = transactions[
@@ -177,20 +314,27 @@ transactions = transactions[
 ]
 
 transactions.to_csv(
-    f"{processed_path}/08_investor_transactions.csv",
+    PROCESSED_DIR / "08_investor_transactions.csv",
     index=False
 )
 
-print("08_investor_transactions cleaned")
+print("✓ 08_investor_transactions cleaned")
 
-# =====================================================
+
+# ============================================================
 # 09 PORTFOLIO HOLDINGS
-# =====================================================
+# ============================================================
 
-portfolio.drop_duplicates(inplace=True)
+portfolio = portfolio.drop_duplicates()
 
 portfolio["portfolio_date"] = pd.to_datetime(
-    portfolio["portfolio_date"]
+    portfolio["portfolio_date"],
+    errors="coerce"
+)
+
+portfolio["weight_pct"] = pd.to_numeric(
+    portfolio["weight_pct"],
+    errors="coerce"
 )
 
 portfolio = portfolio[
@@ -198,20 +342,27 @@ portfolio = portfolio[
 ]
 
 portfolio.to_csv(
-    f"{processed_path}/09_portfolio_holdings.csv",
+    PROCESSED_DIR / "09_portfolio_holdings.csv",
     index=False
 )
 
-print("09_portfolio_holdings cleaned")
+print("✓ 09_portfolio_holdings cleaned")
 
-# =====================================================
+
+# ============================================================
 # 10 BENCHMARK INDICES
-# =====================================================
+# ============================================================
 
-benchmark.drop_duplicates(inplace=True)
+benchmark = benchmark.drop_duplicates()
 
 benchmark["date"] = pd.to_datetime(
-    benchmark["date"]
+    benchmark["date"],
+    errors="coerce"
+)
+
+benchmark["close_value"] = pd.to_numeric(
+    benchmark["close_value"],
+    errors="coerce"
 )
 
 benchmark = benchmark[
@@ -219,10 +370,20 @@ benchmark = benchmark[
 ]
 
 benchmark.to_csv(
-    f"{processed_path}/10_benchmark_indices.csv",
+    PROCESSED_DIR / "10_benchmark_indices.csv",
     index=False
 )
 
-print("10_benchmark_indices cleaned")
+print("✓ 10_benchmark_indices cleaned")
 
-print("\nAll datasets cleaned successfully!")
+
+# ============================================================
+# FINAL STATUS
+# ============================================================
+
+print("\n" + "=" * 60)
+print("ALL DATASETS CLEANED SUCCESSFULLY")
+print("=" * 60)
+
+print(f"Raw data directory       : {RAW_DIR.resolve()}")
+print(f"Processed data directory : {PROCESSED_DIR.resolve()}")

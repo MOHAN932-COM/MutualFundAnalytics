@@ -1,72 +1,123 @@
+from pathlib import Path
+import sqlite3
 import pandas as pd
 from sqlalchemy import create_engine
 
-# Create SQLite database
-engine = create_engine("sqlite:///bluestock_mf.db")
 
-processed = "data/processed"
+# ============================================================
+# PROJECT PATHS
+# ============================================================
 
-# Read cleaned CSVs
-fund_master = pd.read_csv(f"{processed}/01_fund_master.csv")
-nav_history = pd.read_csv(f"{processed}/02_nav_history.csv")
-aum = pd.read_csv(f"{processed}/03_aum_by_fund_house.csv")
-sip = pd.read_csv(f"{processed}/04_monthly_sip_inflows.csv")
-category = pd.read_csv(f"{processed}/05_category_inflows.csv")
-folio = pd.read_csv(f"{processed}/06_industry_folio_count.csv")
-performance = pd.read_csv(f"{processed}/07_scheme_performance.csv")
-transactions = pd.read_csv(f"{processed}/08_investor_transactions.csv")
-portfolio = pd.read_csv(f"{processed}/09_portfolio_holdings.csv")
-benchmark = pd.read_csv(f"{processed}/10_benchmark_indices.csv")
+BASE_DIR = Path(__file__).resolve().parent
 
-# Load into SQLite
-fund_master.to_sql("fund_master", engine, if_exists="replace", index=False)
-nav_history.to_sql("nav_history", engine, if_exists="replace", index=False)
-aum.to_sql("aum_by_fund_house", engine, if_exists="replace", index=False)
-sip.to_sql("monthly_sip_inflows", engine, if_exists="replace", index=False)
-category.to_sql("category_inflows", engine, if_exists="replace", index=False)
-folio.to_sql("industry_folio_count", engine, if_exists="replace", index=False)
-performance.to_sql("scheme_performance", engine, if_exists="replace", index=False)
-transactions.to_sql("investor_transactions", engine, if_exists="replace", index=False)
-portfolio.to_sql("portfolio_holdings", engine, if_exists="replace", index=False)
-benchmark.to_sql("benchmark_indices", engine, if_exists="replace", index=False)
+# load_sqlite.py is currently in the project root.
+# Therefore BASE_DIR is the project root.
+PROJECT_DIR = BASE_DIR
 
-print("fund_master loaded")
-print("nav_history loaded")
-print("aum_by_fund_house loaded")
-print("monthly_sip_inflows loaded")
-print("category_inflows loaded")
-print("industry_folio_count loaded")
-print("scheme_performance loaded")
-print("investor_transactions loaded")
-print("portfolio_holdings loaded")
-print("benchmark_indices loaded")
+PROCESSED_DIR = PROJECT_DIR / "data" / "processed"
+DB_DIR = PROJECT_DIR / "data" / "db"
+DB_PATH = DB_DIR / "bluestock_mf.db"
+
+DB_DIR.mkdir(parents=True, exist_ok=True)
+
+
+# ============================================================
+# DATABASE CONNECTION
+# ============================================================
+
+engine = create_engine(
+    f"sqlite:///{DB_PATH.as_posix()}"
+)
+
+
+# ============================================================
+# PROCESSED CSV FILES
+# ============================================================
+
+files = {
+    "fund_master": "01_fund_master.csv",
+    "nav_history": "02_nav_history.csv",
+    "aum_by_fund_house": "03_aum_by_fund_house.csv",
+    "monthly_sip_inflows": "04_monthly_sip_inflows.csv",
+    "category_inflows": "05_category_inflows.csv",
+    "industry_folio_count": "06_industry_folio_count.csv",
+    "scheme_performance": "07_scheme_performance.csv",
+    "investor_transactions": "08_investor_transactions.csv",
+    "portfolio_holdings": "09_portfolio_holdings.csv",
+    "benchmark_indices": "10_benchmark_indices.csv",
+}
+
+
+# ============================================================
+# LOAD CSV FILES INTO SQLITE
+# ============================================================
+
+print("=" * 60)
+print("LOADING PROCESSED DATA INTO SQLITE")
+print("=" * 60)
+
+for table_name, filename in files.items():
+
+    csv_path = PROCESSED_DIR / filename
+
+    if not csv_path.exists():
+        raise FileNotFoundError(
+            f"Processed file not found: {csv_path}"
+        )
+
+    df = pd.read_csv(csv_path)
+
+    df.to_sql(
+        table_name,
+        engine,
+        if_exists="replace",
+        index=False
+    )
+
+    print(
+        f"✓ {table_name:<30} "
+        f"{len(df):>8} rows"
+    )
+
 
 print("\nAll tables loaded successfully!")
-import sqlite3
 
-conn = sqlite3.connect("bluestock_mf.db")
+
+# ============================================================
+# DATABASE VERIFICATION
+# ============================================================
+
+print("\n" + "=" * 60)
+print("DATABASE ROW COUNT VERIFICATION")
+print("=" * 60)
+
+conn = sqlite3.connect(DB_PATH)
 cursor = conn.cursor()
 
-tables = [
-    "fund_master",
-    "nav_history",
-    "aum_by_fund_house",
-    "monthly_sip_inflows",
-    "category_inflows",
-    "industry_folio_count",
-    "scheme_performance",
-    "investor_transactions",
-    "portfolio_holdings",
-    "benchmark_indices"
-]
+for table_name in files.keys():
 
-print("\n========== ROW COUNT VERIFICATION ==========\n")
+    cursor.execute(
+        f"SELECT COUNT(*) FROM {table_name}"
+    )
 
-for table in tables:
-    cursor.execute(f"SELECT COUNT(*) FROM {table}")
     count = cursor.fetchone()[0]
-    print(f"{table:<30} {count}")
+
+    print(
+        f"{table_name:<30} {count:>8}"
+    )
 
 conn.close()
 
-print("\nDatabase verification completed successfully!")
+
+# ============================================================
+# FINAL STATUS
+# ============================================================
+
+print("\n" + "=" * 60)
+print("DATABASE INFORMATION")
+print("=" * 60)
+
+print(f"Database path : {DB_PATH.resolve()}")
+print(f"Database size : {DB_PATH.stat().st_size:,} bytes")
+
+print("\n✓ Database verification completed successfully!")
