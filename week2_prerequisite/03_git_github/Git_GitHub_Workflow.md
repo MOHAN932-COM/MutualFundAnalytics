@@ -31,3 +31,25 @@ Example:
 
 ```bash
 git clone <repository-url>
+## 12. Branch Demonstration
+
+A separate branch named `week2-git-documentation` was created to demonstrate feature-based development.
+
+The workflow is:
+
+```text
+master
+   ↓
+Create feature branch
+   ↓
+week2-git-documentation
+   ↓
+Make changes
+   ↓
+Commit
+   ↓
+Push branch
+   ↓
+Pull Request
+   ↓
+Merge into master
